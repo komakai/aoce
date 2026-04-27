@@ -14,7 +14,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.samples.aocencnntest.R;
+import aoce.samples.aocencnntest.R;
 
 import aoce.android.library.xswig.*;
 import aoce.android.library.wrapper.*;

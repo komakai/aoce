@@ -1,6 +1,22 @@
 apply plugin: 'com.android.application'
 
 android {
+    tasks.withType(JavaCompile).configureEach {
+        options.fork = true
+        options.forkOptions.jvmArgs += [
+                '--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED',
+        ]
+
+    }
     signingConfigs {
         aa {
             storeFile file('..\\..\\aoce_android_install.jks')
@@ -9,13 +25,14 @@ android {
             keyAlias 'key0'
         }
     }
-    compileSdkVersion 28
+    compileSdk 30
     defaultConfig {
         applicationId "aoce.samples.aocencnntest"
         minSdkVersion 26
-        targetSdkVersion 28
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
+        namespace "aoce.samples.aocencnntest"
         signingConfig signingConfigs.aa
     }
     buildTypes {
@@ -29,16 +46,17 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = 1.8
-        targetCompatibility = 1.8
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
         encoding="UTF-8"
     }
     sourceSets {
         main {
             assets.srcDirs = ['assets']
-            jniLibs.srcDirs = ['libs']
+            jniLibs.srcDirs = ['src/main/ncnnLib']
         }
     }
+    ndkVersion '21.4.7075529'
     // ndkVersion '21.1.6352462'
 }
 
@@ -72,7 +90,7 @@ dependencies {
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     //for permission
-    implementation 'com.yanzhenjie:permission:2.0.3'
+    implementation 'com.yanzhenjie:permission:2.0.2'
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation project(path: ':aoce')

@@ -1,22 +1,25 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 28
+    compileSdk 30
     defaultConfig {
         applicationId "aoce.samples.vulkantest"
         minSdkVersion 26
-        targetSdkVersion 28
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
+        namespace "aoce.samples.vulkantest"
         ndk {
             abiFilters "arm64-v8a"
         }
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++14 -frtti -fexceptions"
-                arguments "-DANDROID_STL=c++_shared", "-DANDROID_TOOLCHAIN=clang",
-                        "-DAOCE_ENABLE_SAMPLES=ON", "-DAOCE_INSTALL_FFMPEG=OFF",
-                        "-DAOCE_INSTALL_AGORA=OFF","-DAOCE_ENABLE_SWIG=ON","-DAOCE_INSTALL_NCNN=ON"
+                arguments "--debug-find", "-DANDROID_STL=c++_shared", "-DANDROID_TOOLCHAIN=clang",
+                        "-DAOCE_ENABLE_SAMPLES=ON", "-DAOCE_INSTALL_FFMPEG=OFF", "-DNCNN_SIMPLEVK=OFF",
+                        "-DAOCE_INSTALL_AGORA=OFF","-DAOCE_ENABLE_SWIG=ON","-DAOCE_INSTALL_NCNN=ON",
+                        "-DNCNN_INCLUDE_DIR=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/include/ncnn",
+                        "-DNCNN_LIB_SEARCH_PATH=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/lib"
             }
         }
     }
@@ -41,6 +44,8 @@ android {
             path "../../CMakeLists.txt"
         }
     }
+    ndkVersion '21.4.7075529'
+
 }
 
 task copyTask {

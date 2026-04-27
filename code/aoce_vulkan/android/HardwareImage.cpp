@@ -254,7 +254,7 @@ void HardwareImage::bindVK(AHardwareBuffer *buffer, bool useExternalFormat) {
     saveContext();
     makeCurrent();
     EGLint attrs[] = {EGL_NONE};
-    image = eglCreateImageKHR(display, context, EGL_NATIVE_BUFFER_ANDROID,
+    image = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
                               native_buffer, attrs);
     // assert(image != EGL_NO_IMAGE_KHR);
     if (image == EGL_NO_IMAGE_KHR) {
