@@ -1,5 +1,7 @@
 #include "VkNcnnInLayer.hpp"
 
+#include <algorithm>
+
 #include "aoce/AoceMath.h"
 #include "aoce/layer/PipeGraph.hpp"
 #include "aoce_vulkan/vulkan/VulkanPipeline.hpp"
@@ -29,18 +31,21 @@ void VkNcnnInLayer::setObserver(INcnnInLayerObserver* observer,
 }
 
 void VkNcnnInLayer::updateParamet(const NcnnInParamet& nparamet, bool fP16) {
-    if (paramet.outHeight != nparamet.outHeight ||
-        paramet.outWidth != nparamet.outHeight || bFP16 != fP16) {
-        bFP16 = fP16;
-        paramet.outWidth = nparamet.outWidth;
-        paramet.outHeight = nparamet.outHeight;
-        resetGraph();
-    }
-    if (!(paramet.mean == nparamet.mean) ||
-        !(paramet.scale == nparamet.scale)) {
-        paramet.mean = nparamet.mean;
-        paramet.scale = nparamet.scale;
+    bool bSizeChange = paramet.outHeight != nparamet.outHeight ||
+                       paramet.outWidth != nparamet.outWidth || bFP16 != fP16;
+    bool bValueChange = !(paramet.mean == nparamet.mean) ||
+                        !(paramet.scale == nparamet.scale);
+    bFP16 = fP16;
+    paramet.outWidth = nparamet.outWidth;
+    paramet.outHeight = nparamet.outHeight;
+    paramet.mean = nparamet.mean;
+    paramet.scale = nparamet.scale;
+    // 大小也在UBO里,shader按outWidth/outHeight写入,改变大小时同样需要更新UBO
+    if (bSizeChange || bValueChange) {
         onParametChange(true);
+    }
+    if (bSizeChange) {
+        resetGraph();
     }
 }
 
@@ -175,7 +180,22 @@ void VkNcnnInCropLayer::getInFaceBox(FaceBox& box) { box = faceBox; }
 void VkNcnnInCropLayer::detectFaceBox(const FaceBox* boxs, int32_t lenght) {
     bFindBox = lenght > 0;
     if (bFindBox) {
-        const FaceBox& box = boxs[0];
+        FaceBox box = boxs[0];
+        // 关键点网络输入是正方形,把人脸框在像素空间扩成正方形,避免裁剪出的人脸被拉伸
+        float fw = (float)inFormats[0].width;
+        float fh = (float)inFormats[0].height;
+        if (fw > 0 && fh > 0) {
+            float side = std::max((box.x2 - box.x1) * fw, (box.y2 - box.y1) * fh);
+            float halfW = std::min(side / fw, 1.0f) / 2.0f;
+            float halfH = std::min(side / fh, 1.0f) / 2.0f;
+            // 中心移到画面内,保证正方形不超出边界
+            float cx = std::min(std::max((box.x1 + box.x2) / 2.0f, halfW), 1.0f - halfW);
+            float cy = std::min(std::max((box.y1 + box.y2) / 2.0f, halfH), 1.0f - halfH);
+            box.x1 = cx - halfW;
+            box.x2 = cx + halfW;
+            box.y1 = cy - halfH;
+            box.y2 = cy + halfH;
+        }
         cropParamet.crop.x = box.x1;
         cropParamet.crop.y = box.x2;
         cropParamet.crop.z = box.y1;

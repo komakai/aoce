@@ -15,11 +15,9 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++14 -frtti -fexceptions"
-                arguments "--debug-find", "-DANDROID_STL=c++_shared", "-DANDROID_TOOLCHAIN=clang",
+                arguments "-DANDROID_STL=c++_shared", "-DANDROID_TOOLCHAIN=clang",
                         "-DAOCE_ENABLE_SAMPLES=ON", "-DAOCE_INSTALL_FFMPEG=OFF", "-DNCNN_SIMPLEVK=OFF",
-                        "-DAOCE_INSTALL_AGORA=OFF","-DAOCE_ENABLE_SWIG=ON","-DAOCE_INSTALL_NCNN=ON",
-                        "-DNCNN_INCLUDE_DIR=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/include/ncnn",
-                        "-DNCNN_LIB_SEARCH_PATH=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/lib"
+                        "-DAOCE_INSTALL_AGORA=OFF","-DAOCE_ENABLE_SWIG=OFF","-DAOCE_INSTALL_NCNN=ON"
             }
         }
     }
@@ -44,7 +42,6 @@ android {
             path "../../CMakeLists.txt"
         }
     }
-    ndkVersion '21.4.7075529'
 
 }
 

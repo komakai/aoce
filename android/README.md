@@ -2,41 +2,31 @@
 
 ## 配置
 
-先需要使用swig把C++接口转换生成的java代码,成功后会存放在android/aoce/src/main/java/aoce/android/library这个文件夹xswig.
+用Android Studio直接打开android目录即可编译运行aoceswigtest/aocencnntest,不需要手动步骤.
 
-要使用swig生成相应java代码,首先请在这个目录android/aoce/src/main/java/aoce/android/library下,新建一个xswig文件夹,并按照如下步骤操作.
+唯一的前提是安装[swig](http://www.swig.org/download.html)(macOS可用`brew install swig`),并加入PATH.
+如果不想加入PATH,可以在android/local.properties里指定:
 
-1 安装[swig](http://www.swig.org/download.html),把带swig.exe的目录添加到环境变量Path中.
+```
+swig.executable=C:/tools/swigwin-4.3.1/swig.exe
+```
 
-2 按照如下图settings.gradle的设置,只启用04_vulkantest,因为这个项目相对独立,只使用C++.
+编译时会自动完成以下工作:
 
-![avatar](../assets/images/android_build1.png "")
+1. aoce模块的generateSwigJava任务调用swig,把swig/aocewrapper.i转换生成java文件(aoce/build/generated/swig/java,包名aoce.android.library.xswig)与C++包装文件.只有swig/*.i或code下的头文件改变时才会重新生成.
+2. CMake编译生成的C++包装文件得到libaoce_swig_java.so.
+3. 如果thirdparty/ncnn/android不存在,第一次同步时会自动下载ncnn官方发布包[ncnn-20260113-android-vulkan-shared](https://github.com/Tencent/ncnn/releases/tag/20260113),并把头文件里的NCNN_SIMPLEVK改为0(与aoce使用的vulkan头文件兼容).libncnn.so会自动打包进aoce.
 
-注意修改这个文件后,请点击Sync Now等待完成后继续操作.
+### 选项
 
-3 设置编译项以及使用swig转换生成的C++接口java文件.
+在android/local.properties或android/gradle.properties里设置(也可以用命令行-P):
 
-注意先转到对应的04_vulkantest下的build.gradle文件,请设置对应的cmake/arguments,在这,假设要使用aoce_ncnn模块,注意要把-DAOCE_INSTALL_NCNN=ON编译设置加上,这个设置会影响swig生成的文件,改变后需要重新生成.
+| 选项 | 默认 | 说明 |
+| --- | --- | --- |
+| `aoce.ncnn` | `true` | 是否编译aoce_ncnn模块.会改变swig生成的java文件,aocencnntest需要开启.只看aoceswigtest里的滤镜可以关闭,减小apk大小. |
+| `swig.executable` | PATH里的swig | swig可执行文件路径,也可以用环境变量`SWIG_EXECUTABLE`. |
 
-![avatar](../assets/images/android_build4.png)
-
-连接真机,运行与调试都行,过程中编译C++成功后,就会在如下目录生成我们所需要的转换文件.
-
-![avatar](../assets/images/android_build2.png)
-
-一般来说,这个目录会在(project/.cxx/cmake/{build type}/{abi}/swig/Java/swig)下,根据我的配置,就在(04_vulkantest/.cxx/cmake/debug/arm64-v8a/swig/Java/swig)下.
-
-复制这个目录所有文件到android/aoce/src/main/java/aoce/android/library/xswig下,本来在CMake有定义相关逻辑自动复制过去,但是逻辑现在不完善,有时可以有时不行,最好手动操作一下吧.
-
-4 转到java项目上来,还是针对settings.gradle设置.
-
-![avatar](../assets/images/android_build3.png)
-
-其中最好把aoce里的build.gradle文件中的cmake/arguments设置与04_vulkantest相同.
-
-![avatar](../assets/images/android_build5.png)
-
-等待Sync Now完成后,应该就是如上图显示,有了swig的生成文件,项目相应引用就不会有问题了.
+ncnn必须是官方android-vulkan-shared发布包(`android/{abi}/include/ncnn`, `android/{abi}/lib/libncnn.so`).aoce_thirdparty里的老版本ncnn直接链接libvulkan.so,会与aoce_vulkan导出的vkXXX函数指针冲突导致启动崩溃,如果检测到会自动移到`android.old`并重新下载.
 
 ## demo
 
@@ -50,6 +40,4 @@ aocencnntest 是联合深度神经网络推理框架ncnn的一些demo测试.
 
 ## 注意
 
-如果你改变aoce下的build.gradle里的externalNativeBuild/cmake/arguments里选项,如有些选项AOCE_INSTALL_NCNN会改变swig产生的文件,改变后请按照如上步骤重新生成swig转换的java文件.比如你要看aoceswigtest里的滤镜,就不用包含ncnn相关的so文件(vulkan版本有点大),就把AOCE_INSTALL_NCNN=OFF,让如上设置重新生成,如果你不介意大小,可以使用相同生成的swig,但是需要注意,需要在aoceswigtest当前build.gradle里复制ncnn相关so文件,类似aocencnntest中的build.gradle中的任务copyNcnn,并且需要调用System.loadLibrary("ncnn");确保不会因为没正确加载so文件而crash.
-
-如果你要运行04_vulkantest/05_livetest/06_mediaplayer/07_androidtest/vulkanextratest这几个项目,你需要AOCE_ENABLE_SAMPLES设置为ON,这个选项不会改变SWIG生成的文件.
+如果你要运行04_vulkantest/05_livetest/06_mediaplayer/07_androidtest/vulkanextratest这几个项目,需要在settings.gradle.kts里include对应项目,这些项目设置了AOCE_ENABLE_SAMPLES=ON,不需要swig.

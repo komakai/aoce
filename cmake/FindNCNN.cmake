@@ -5,6 +5,25 @@ start_android_find_host()
 set(NCNN_PREFIX_PATH ${AOCE_THIRDPARTY_PATH}/ncnn)
 
 create_search_paths(NCNN)
+if(ANDROID)
+    # 支持两种目录结构:
+    # aoce_thirdparty: android/include/ncnn, android/{abi}/libncnn.so
+    # ncnn官方android发布包: android/{abi}/include/ncnn, android/{abi}/lib/libncnn.so
+    foreach(dir ${NCNN_PREFIX_PATH})
+        set(NCNN_INC_SEARCH_PATH ${NCNN_INC_SEARCH_PATH}
+            ${dir}/android/include/ncnn ${dir}/android/${ANDROID_ABI}/include/ncnn)
+        set(NCNN_LIB_SEARCH_PATH ${NCNN_LIB_SEARCH_PATH}
+            ${dir}/android/${ANDROID_ABI} ${dir}/android/${ANDROID_ABI}/lib)
+    endforeach()
+endif()
+
+# thirdparty/ncnn被替换后,丢弃CMakeCache里已经不存在的路径
+if(NCNN_INCLUDE_DIR AND NOT EXISTS "${NCNN_INCLUDE_DIR}/net.h")
+    unset(NCNN_INCLUDE_DIR CACHE)
+endif()
+if(NCNN_LIBRARYS AND NOT EXISTS "${NCNN_LIBRARYS}")
+    unset(NCNN_LIBRARYS CACHE)
+endif()
 
 find_path(NCNN_INCLUDE_DIR NAME net.h HINTS ${NCNN_INC_SEARCH_PATH} PATH_SUFFIXES)
 message(STATUS "ncnn include:" ${NCNN_INCLUDE_DIR})

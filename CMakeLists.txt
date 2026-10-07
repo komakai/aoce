@@ -152,10 +152,15 @@ add_subdirectory(glsl)
 if(AOCE_ENABLE_SWIG) 
     # REQUIRED 
     message(STATUS "start swig convert other language")
-    find_package(SWIG)
-    if(SWIG_FOUND)       
+    if(ANDROID AND AOCE_SWIG_JAVA_WRAPPER)
+        # gradle已经调用swig生成好C++/java文件,这里只需编译
         add_subdirectory(swig)
-    endif(SWIG_FOUND)
+    else()
+        find_package(SWIG)
+        if(SWIG_FOUND)
+            add_subdirectory(swig)
+        endif(SWIG_FOUND)
+    endif()
 endif()
 
 

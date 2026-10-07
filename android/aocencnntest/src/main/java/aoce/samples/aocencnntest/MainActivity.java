@@ -6,14 +6,10 @@ import butterknife.BindView;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.hardware.display.DisplayManager;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.TextView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import aoce.samples.aocencnntest.R;
 
 import aoce.android.library.xswig.*;
@@ -25,8 +21,6 @@ public class MainActivity extends AppCompatActivity implements IGLCopyTexture {
     private GLVideoRender glVideoRender = null;
     private AoceManager aoceManager = null;
 
-    FloatingActionButton btnLoad = null;
-    TextView textView = null;
     static {
         System.loadLibrary("ncnn");
     }
@@ -39,14 +33,6 @@ public class MainActivity extends AppCompatActivity implements IGLCopyTexture {
         glVideoRender = new GLVideoRender();
         GLSurfaceView glSurfaceView = findViewById(R.id.es_surface_view);
         glVideoRender.init(glSurfaceView, this);
-
-        btnLoad = findViewById(R.id.floatingActionButton);
-        btnLoad.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // aoceManager.loadNet();
-            }
-        });
 
         if (checkSelfPermission(Manifest.permission.CAMERA) !=
                 PackageManager.PERMISSION_GRANTED) {
@@ -64,12 +50,40 @@ public class MainActivity extends AppCompatActivity implements IGLCopyTexture {
         AoceWrapper.loadAoce();
         aoceManager = new AoceManager();
         aoceManager.initGraph();
-        aoceManager.openCamera(true);
+        aoceManager.openCamera(this, true);
+        aoceManager.setDisplayRotation(getDisplayRotation());
+        DisplayManager displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
+        displayManager.registerDisplayListener(displayListener, null);
     }
+
+    private int getDisplayRotation() {
+        return getWindowManager().getDefaultDisplay().getRotation();
+    }
+
+    // manifest里声明了configChanges,旋转时不重建activity,只调整画面方向.
+    // 90度与270度之间直接切换不会触发onConfigurationChanged,所以监听display变化
+    private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) {
+        }
+
+        @Override
+        public void onDisplayRemoved(int displayId) {
+        }
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+            if (aoceManager != null) {
+                aoceManager.setDisplayRotation(getDisplayRotation());
+            }
+        }
+    };
 
     @Override
     protected void onStop() {
         super.onStop();
+        DisplayManager displayManager = (DisplayManager) getSystemService(DISPLAY_SERVICE);
+        displayManager.unregisterDisplayListener(displayListener);
         aoceManager.closeCamera();
     }
 

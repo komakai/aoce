@@ -1,4 +1,173 @@
+import javax.inject.Inject
+
 apply plugin: 'com.android.library'
+
+// 仓库根目录(CMakeLists.txt/swig/code所在目录)
+def aoceRoot = rootProject.file('..')
+
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+// 依次从local.properties/gradle.properties(-P)读取配置
+def aoceProp = { String name, String defaultValue = null ->
+    localProps.getProperty(name) ?: (project.findProperty(name)?.toString() ?: defaultValue)
+}
+
+// ---------------------------------------------------------------------------
+// NCNN
+// aoce.ncnn=true/false 控制是否编译aoce_ncnn模块,这个选项会改变swig生成的java文件.
+// 如果thirdparty/ncnn/android不存在,会自动下载ncnn官方android-vulkan-shared发布包.
+// 注意必须使用simplevk版本的ncnn(自己加载libvulkan.so),aoce_vulkan导出了vkXXX函数指针变量,
+// 直接链接libvulkan.so的老版本ncnn(比如aoce_thirdparty里的)会调用到这些变量而崩溃.
+// ---------------------------------------------------------------------------
+def enableNcnn = aoceProp('aoce.ncnn', 'true').toBoolean()
+def ncnnDir = new File(aoceRoot, 'thirdparty/ncnn/android')
+def ncnnVersion = '20260113'
+
+// ncnn官方发布包结构: {abi}/include/ncnn, {abi}/lib/libncnn.so
+def hasNcnn = { File dir ->
+    new File(dir, 'arm64-v8a/include/ncnn/net.h').exists() &&
+            new File(dir, 'arm64-v8a/lib/libncnn.so').exists()
+}
+
+// CMake配置(包括Android Studio同步)前就需要头文件,所以在配置阶段下载
+if (enableNcnn && !hasNcnn(ncnnDir)) {
+    if (ncnnDir.exists()) {
+        def oldDir = new File(ncnnDir.parentFile, 'android.old')
+        logger.lifecycle("aoce: ${ncnnDir} is not an ncnn android-vulkan-shared release, moving it to ${oldDir}")
+        project.delete(oldDir)
+        if (!ncnnDir.renameTo(oldDir)) {
+            throw new GradleException("aoce: could not move ${ncnnDir} to ${oldDir}")
+        }
+    }
+    def name = "ncnn-${ncnnVersion}-android-vulkan-shared"
+    logger.lifecycle("aoce: downloading ${name} to ${ncnnDir}")
+    def zip = new File(ncnnDir.parentFile, "${name}.zip")
+    def tmpDir = new File(ncnnDir.parentFile, 'android.download')
+    zip.parentFile.mkdirs()
+    new URL("https://github.com/Tencent/ncnn/releases/download/${ncnnVersion}/${name}.zip")
+            .withInputStream { input -> zip.withOutputStream { it << input } }
+    project.delete(tmpDir)
+    project.copy {
+        from(zipTree(zip)) {
+            eachFile { it.path = it.path.substring(it.path.indexOf('/') + 1) }
+            includeEmptyDirs = false
+        }
+        into tmpDir
+    }
+    project.delete(zip)
+    if (!hasNcnn(tmpDir)) {
+        throw new GradleException("aoce: downloaded NCNN in ${tmpDir} is incomplete")
+    }
+    if (!tmpDir.renameTo(ncnnDir)) {
+        throw new GradleException("aoce: could not move ${tmpDir} to ${ncnnDir}")
+    }
+}
+
+// ncnn头文件默认使用自带的simplevk.h声明vulkan类型,与aoce使用的<vulkan/vulkan.h>重复定义.
+// 改成使用系统vulkan头文件,libncnn.so本身不受影响(仍然自己加载libvulkan.so)
+if (enableNcnn) {
+    fileTree(ncnnDir) { include '*/include/ncnn/platform.h' }.each { File header ->
+        def text = header.getText('UTF-8')
+        if (text.contains('#define NCNN_SIMPLEVK 1')) {
+            logger.lifecycle("aoce: setting NCNN_SIMPLEVK 0 in ${header}")
+            header.setText(text.replace('#define NCNN_SIMPLEVK 1', '#define NCNN_SIMPLEVK 0'), 'UTF-8')
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SWIG
+// 由gradle直接调用swig,同时生成java与C++包装文件.java文件作为生成源码加入本模块,
+// C++文件通过AOCE_SWIG_JAVA_WRAPPER传给CMake编译成libaoce_swig_java.so.
+// swig查找顺序: local.properties的swig.executable,环境变量SWIG_EXECUTABLE,PATH.
+// ---------------------------------------------------------------------------
+def findSwig = {
+    def configured = aoceProp('swig.executable') ?: System.getenv('SWIG_EXECUTABLE')
+    if (configured) {
+        return configured
+    }
+    def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+    def exeNames = isWindows ? ['swig.exe', 'swig4.0.exe'] : ['swig', 'swig4.0']
+    def searchDirs = (System.getenv('PATH') ?: '').split(File.pathSeparator).toList()
+    if (isWindows) {
+        // winget install SWIG.SWIG 不会把swig加入PATH
+        def wingetPackages = new File(System.getenv('LOCALAPPDATA') ?: '', 'Microsoft/WinGet/Packages')
+        wingetPackages.listFiles()?.findAll { it.name.startsWith('SWIG.SWIG_') }?.each { pkg ->
+            pkg.listFiles()?.findAll { it.name.startsWith('swigwin-') }?.sort { it.name }?.reverse()?.each {
+                searchDirs += it.absolutePath
+            }
+        }
+    } else {
+        // Android Studio从Dock启动时PATH里没有homebrew等目录
+        searchDirs += ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']
+    }
+    for (dir in searchDirs) {
+        for (name in exeNames) {
+            def f = new File(dir, name)
+            if (f.canExecute()) {
+                return f.absolutePath
+            }
+        }
+    }
+    throw new GradleException('aoce: swig not found. Install swig (https://www.swig.org/download.html, ' +
+            '`brew install swig` on macOS) and add it to PATH, or set swig.executable=/path/to/swig ' +
+            'in android/local.properties.')
+}
+
+abstract class SwigJavaTask extends DefaultTask {
+    @Input abstract Property<String> getSwigExecutable()
+    @Input abstract Property<String> getJavaPackage()
+    @Input abstract ListProperty<String> getDefines()
+    @InputFile @PathSensitive(PathSensitivity.RELATIVE) abstract RegularFileProperty getInterfaceFile()
+    @Internal abstract DirectoryProperty getIncludeDir()
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE) abstract ConfigurableFileCollection getHeaders()
+    @OutputDirectory abstract DirectoryProperty getJavaOutDir()
+    @OutputFile abstract RegularFileProperty getCppOutFile()
+    // 老的手动流程会把生成文件复制到源码目录,与新生成文件冲突,需要删除
+    @Internal abstract ConfigurableFileCollection getLegacyOutputDirs()
+
+    @Inject abstract ExecOperations getExecOps()
+    @Inject abstract FileSystemOperations getFs()
+
+    @TaskAction
+    void generate() {
+        legacyOutputDirs.files.findAll { it.exists() }.each { dir ->
+            logger.lifecycle("aoce: removing stale swig output ${dir}")
+            fs.delete { it.delete(dir) }
+        }
+        def javaDir = new File(javaOutDir.get().asFile, javaPackage.get().replace('.', '/'))
+        fs.delete { it.delete(javaOutDir) }
+        javaDir.mkdirs()
+        cppOutFile.get().asFile.parentFile.mkdirs()
+        execOps.exec {
+            executable swigExecutable.get()
+            args '-java', '-c++', '-package', javaPackage.get(), '-O'
+            args defines.get().collect { "-D${it}" }
+            args "-I${includeDir.get().asFile.absolutePath}"
+            args '-outdir', javaDir.absolutePath
+            args '-o', cppOutFile.get().asFile.absolutePath
+            args interfaceFile.get().asFile.absolutePath
+        }
+    }
+}
+
+def swigCppFile = layout.buildDirectory.file('generated/swig/cpp/aocewrapperJAVA_wrap.cxx')
+def generateSwigJava = tasks.register('generateSwigJava', SwigJavaTask) {
+    swigExecutable = providers.provider { findSwig() }
+    javaPackage = 'aoce.android.library.xswig'
+    defines = enableNcnn ? ['AOCE_INSTALL_NCNN'] : []
+    interfaceFile = new File(aoceRoot, 'swig/aocewrapper.i')
+    includeDir = new File(aoceRoot, 'code')
+    headers.from(fileTree(new File(aoceRoot, 'code')) { include '**/*.h', '**/*.hpp' })
+    headers.from(fileTree(new File(aoceRoot, 'swig')) { include '**/*.i' })
+    javaOutDir = layout.buildDirectory.dir('generated/swig/java')
+    cppOutFile = swigCppFile
+    legacyOutputDirs.from(file('src/main/java/aoce/android/library/xswig'),
+            file('src/main/java/aoce/android/library/swig'))
+}
 
 android {
     compileSdk 30
@@ -20,9 +189,9 @@ android {
                 cppFlags "-std=c++14"
                 arguments "-DANDROID_STL=c++_shared", "-DANDROID_TOOLCHAIN=clang",
                         "-DAOCE_ENABLE_SAMPLES=OFF", "-DAOCE_INSTALL_FFMPEG=OFF",
-                        "-DAOCE_INSTALL_AGORA=OFF","-DAOCE_ENABLE_SWIG=ON","-DAOCE_INSTALL_NCNN=ON",
-                        "-DNCNN_INCLUDE_DIR=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/include/ncnn",
-                        "-DNCNN_LIB_SEARCH_PATH=/Users/gilespayne/Experiments/aoce/thirdparty/ncnn/android/arm64-v8a/lib"
+                        "-DAOCE_INSTALL_AGORA=OFF", "-DAOCE_ENABLE_SWIG=ON",
+                        "-DAOCE_INSTALL_NCNN=${enableNcnn ? 'ON' : 'OFF'}",
+                        "-DAOCE_SWIG_JAVA_WRAPPER=${swigCppFile.get().asFile.absolutePath.replace('\\', '/')}"
             }
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -41,7 +210,6 @@ android {
         }
         debug {
             jniDebuggable true
-            renderscriptDebuggable true
         }
     }
     externalNativeBuild {
@@ -53,7 +221,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-    ndkVersion '21.4.7075529'
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.java.addGeneratedSourceDirectory(generateSwigJava) { it.javaOutDir }
+    }
+}
+
+// CMake编译aoce_swig_java前需要swig生成的C++文件
+tasks.configureEach { task ->
+    if (task.name.startsWith('configureCMake') || task.name.startsWith('buildCMake')) {
+        task.dependsOn(generateSwigJava)
+    }
 }
 
 task copyTask {

@@ -25,7 +25,9 @@ class FaceDetector : public virtual IFaceDetector,
     int anchorsNum = 0;
     std::unique_ptr<ncnn::Net> net = nullptr;
     // ncnn::Mat inMat;
-    ImageFormat netFormet = {};    
+    ImageFormat netFormet = {};
+    // 网络输入短边长度,长边按输入画面比例计算,避免拉伸
+    int32_t netShortSide = 120;
 
     std::vector<Box> anchors;
     IFaceObserver* observer = nullptr;
@@ -48,6 +50,8 @@ class FaceDetector : public virtual IFaceDetector,
    private:
     bool initNet(FaceDetectorType detectortype);
     void initAnchors();
+    void updateNcnnInParamet();
+    bool updateNetFormat(const ImageFormat& inFormat);
 
    public:
     virtual void setObserver(IFaceObserver* observer) override;

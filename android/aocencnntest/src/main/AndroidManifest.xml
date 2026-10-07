@@ -6,7 +6,9 @@
         android:label="aocencnntest"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name="aoce.samples.aocencnntest.MainActivity">
+        <activity
+            android:name="aoce.samples.aocencnntest.MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

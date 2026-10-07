@@ -7,7 +7,6 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
-        maven { url = uri("https://maven.aliyun.com/nexus/content/groups/public/") }
         gradlePluginPortal()
     }
 }

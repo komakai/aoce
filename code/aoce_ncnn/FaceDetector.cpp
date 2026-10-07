@@ -1,6 +1,8 @@
 #include "FaceDetector.hpp"
 
 #include <AoceManager.hpp>
+#include <algorithm>
+#include <cmath>
 
 #define clip(x, y) (x < 0 ? 0 : (x > y ? y : x))
 
@@ -14,12 +16,13 @@ FaceDetector::FaceDetector(/* args */) {
 // net->opt.use_fp16_packed = false;
 // 网络输入图像格式
 #if WIN32
-    netFormet.width = 320;
-    netFormet.height = 240;
+    netShortSide = 240;
 #elif __ANDROID__
-    netFormet.width = 160;
-    netFormet.height = 120;
+    netShortSide = 120;
 #endif
+    // 收到第一帧后会按画面比例调整(updateNetFormat)
+    netFormet.width = netShortSide * 4 / 3;
+    netFormet.height = netShortSide;
     netFormet.imageType = ImageType::bgr8;
     detectorFaces.resize(MAX_FACE);
 }
@@ -98,12 +101,7 @@ bool FaceDetector::initNet(IBaseLayer* ncnnLayer, IDrawRectLayer* drawlayer) {
     ncnnInLayer = static_cast<VkNcnnInLayer*>(ncnnLayer);
     drawLayer = drawlayer;
     if (bInit && ncnnInLayer) {
-        // const float meanVal[] = {104.f, 117.f, 123.f};
-        NcnnInParamet paramet = {};
-        paramet.mean = {104.f, 117.f, 123.f, 0.0f};
-        paramet.outWidth = netFormet.width;
-        paramet.outHeight = netFormet.height;
-        ncnnInLayer->updateParamet(paramet, net->opt.use_fp16_storage);
+        updateNcnnInParamet();
         ncnnInLayer->setObserver(this, netFormet.imageType);
         if (!ncnnInLayer) {
             logMessage(
@@ -118,9 +116,47 @@ bool FaceDetector::initNet(IBaseLayer* ncnnLayer, IDrawRectLayer* drawlayer) {
     return bInitNet;
 }
 
+void FaceDetector::updateNcnnInParamet() {
+    // const float meanVal[] = {104.f, 117.f, 123.f};
+    NcnnInParamet paramet = {};
+    paramet.mean = {104.f, 117.f, 123.f, 0.0f};
+    paramet.outWidth = netFormet.width;
+    paramet.outHeight = netFormet.height;
+    ncnnInLayer->updateParamet(paramet, net->opt.use_fp16_storage);
+}
+
+bool FaceDetector::updateNetFormat(const ImageFormat& inFormat) {
+    if (inFormat.width <= 0 || inFormat.height <= 0) {
+        return false;
+    }
+    // 横屏/竖屏时网络输入跟着画面比例变化,检测结果是归一化坐标,不需要再拉伸回去
+    int32_t width = netShortSide;
+    int32_t height = netShortSide;
+    if (inFormat.width >= inFormat.height) {
+        width = (int32_t)std::lround(netShortSide * (float)inFormat.width /
+                                     inFormat.height / 2.0f) * 2;
+    } else {
+        height = (int32_t)std::lround(netShortSide * (float)inFormat.height /
+                                      inFormat.width / 2.0f) * 2;
+    }
+    if (width == netFormet.width && height == netFormet.height) {
+        return false;
+    }
+    netFormet.width = width;
+    netFormet.height = height;
+    initAnchors();
+    updateNcnnInParamet();
+    return true;
+}
+
 void FaceDetector::onResult(ncnn::VkMat& vkMat,
                             const ImageFormat& imageFormat) {
     if (!bInitNet) {
+        return;
+    }
+    // 画面比例变化(比如旋转屏幕)后,下一帧才会按新的大小输入
+    if (updateNetFormat(imageFormat) || vkMat.w != netFormet.width ||
+        vkMat.h != netFormet.height) {
         return;
     }
     long long time1 = getNowTimeStamp();
@@ -128,7 +164,8 @@ void FaceDetector::onResult(ncnn::VkMat& vkMat,
     ncnn::Extractor netEx = net->create_extractor();
     ncnn::Mat boxMat, scoreMat, landmarkMat;
 
-    netEx.input(0, vkMat);
+    // 新版ncnn直接输入staging内存里的VkMat结果不对(输出NaN),用映射的CPU Mat作为输入
+    netEx.input(0, vkMat.mapped());
     if (detectorType == FaceDetectorType::face_landmark) {
         // loc
         netEx.extract("output0", boxMat);

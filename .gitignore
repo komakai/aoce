@@ -21,9 +21,6 @@ android/.project
 android/.idea/
 android/.gradle/
 android/local.properties
-android/gradlew.bat
-android/gradlew
-android/gradle/
 android/android.zip
 android/aoce/src/main/java/aoce/android/library/xswig/*.*
 android/aoce/src/main/java/aoce/android/library/swig/*.*

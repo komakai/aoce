@@ -74,7 +74,8 @@ void FaceKeypointDetector::onResult(ncnn::VkMat& vkMat,
     ncnnInLayer->getInFaceBox(faceBox);
 
     ncnn::Extractor netEx = net->create_extractor();
-    netEx.input("input_1", vkMat);
+    // 新版ncnn直接输入staging内存里的VkMat结果不对(输出NaN),用映射的CPU Mat作为输入
+    netEx.input("input_1", vkMat.mapped());
     ncnn::Mat out;
     netEx.extract("415", out);
 
