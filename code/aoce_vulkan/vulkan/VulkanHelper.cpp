@@ -252,6 +252,11 @@ VkResult createInstance(VkInstance& instance, const char* appName,
         VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
     instanceExtensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#elif defined(VK_USE_PLATFORM_METAL_EXT)
+    // MoltenVK
+    instanceExtensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+    instanceExtensions.push_back(
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #elif defined(_DIRECT2DISPLAY)
     instanceExtensions.push_back(VK_KHR_DISPLAY_EXTENSION_NAME);
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)

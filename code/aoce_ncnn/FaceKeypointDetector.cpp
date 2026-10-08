@@ -19,6 +19,16 @@ float expSpecial(float x) {
 FaceKeypointDetector::FaceKeypointDetector(/* args */) {
     net = std::make_unique<ncnn::Net>();
     net->opt.use_vulkan_compute = true;
+#if __APPLE__
+    // Metal GPU family Apple3(A9/A10)上关键点网络用fp16时关键点明显偏移,改用fp32(只慢几毫秒).
+    // Apple3只有16KB threadgroup memory,Apple4(A11)及以后是32KB,用这个区分
+    if (ncnn::get_gpu_count() > 0 &&
+        ncnn::get_gpu_info(0).max_shared_memory_size() < 32 * 1024) {
+        net->opt.use_fp16_storage = false;
+        net->opt.use_fp16_packed = false;
+        net->opt.use_fp16_arithmetic = false;
+    }
+#endif
 // 网络输入图像格式
     netFormet.width = 112;
     netFormet.height = 112;

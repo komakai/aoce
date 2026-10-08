@@ -30,9 +30,12 @@ add_sub_path(audioDevice AOCE_HEADER AOCE_SOURCE)
 # message("aoce source--" ${AOCE_SOURCE}) 
 
 add_definitions(-DAOCE_EXPORT_DEFINE)
-add_library(aoce SHARED ${AOCE_SOURCE} ${AOCE_HEADER})
+add_library(aoce ${AOCE_LIB_TYPE} ${AOCE_SOURCE} ${AOCE_HEADER})
 if(ANDROID)   
     target_link_libraries(aoce android log)
+elseif(IOS)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation)
+    target_link_libraries(aoce ${COREFOUNDATION_FRAMEWORK})
 endif()
 # install的头文件
 set_target_properties(aoce PROPERTIES PUBLIC_HEADER "${AOCE_HEADER}")

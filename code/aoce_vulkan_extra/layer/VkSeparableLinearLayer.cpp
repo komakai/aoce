@@ -1,10 +1,26 @@
 #include "VkSeparableLinearLayer.hpp"
 
 #include "aoce/layer/PipeGraph.hpp"
+#include "aoce_vulkan/vulkan/VulkanManager.hpp"
 #if __ANDROID__
 #include "aoce_vulkan/android/vulkan_wrapper.h"
 #endif
 #define PATCH_PER_BLOCK 4
+
+namespace {
+// rgba32f的共享块需要24KB,共享显存不够的iOS设备(如A9只有16KB)
+// 使用glsl/ios里half存储共享块的版本
+bool useHalfShared() {
+#if __APPLE__
+    VkPhysicalDeviceProperties properties = {};
+    vkGetPhysicalDeviceProperties(aoce::vulkan::VulkanManager::Get().physicalDevice,
+                                  &properties);
+    return properties.limits.maxComputeSharedMemorySize < 24 * 1024;
+#else
+    return false;
+#endif
+}
+}  // namespace
 
 namespace aoce {
 namespace vulkan {
@@ -17,7 +33,8 @@ VkSeparableLayer::VkSeparableLayer(ImageType imageType) {
     if (imageType == ImageType::r8) {
         glslPath = "glsl/filterRowC1.comp.spv";
     } else if (imageType == ImageType::rgba32f) {
-        glslPath = "glsl/filterRowF4.comp.spv";
+        glslPath = useHalfShared() ? "glsl/filterRowF4H.comp.spv"
+                                   : "glsl/filterRowF4.comp.spv";
     }
 }
 
@@ -75,7 +92,8 @@ VkSeparableLinearLayer::VkSeparableLinearLayer(ImageType imageType)
     if (imageType == ImageType::r8) {
         glslPath = "glsl/filterColumnC1.comp.spv";
     } else if (imageType == ImageType::rgba32f) {
-        glslPath = "glsl/filterColumnF4.comp.spv";
+        glslPath = useHalfShared() ? "glsl/filterColumnF4H.comp.spv"
+                                   : "glsl/filterColumnF4.comp.spv";
     }
 }
 

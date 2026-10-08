@@ -4,6 +4,8 @@
 #include "../win32/VkWinImage.hpp"
 #elif __ANDROID__
 #include "../android/HardwareImage.hpp"
+#elif __APPLE__
+#include "../apple/MetalImage.hpp"
 #endif
 #include "VkLayer.hpp"
 
@@ -24,6 +26,8 @@ class AOCE_VULKAN_EXPORT VkOutputLayer : public OutputLayer, public VkLayer {
     bool bWinInterop = false;
 #elif __ANDROID__
     std::unique_ptr<HardwareImage> hardwareImage = nullptr;
+#elif __APPLE__
+    std::unique_ptr<MetalImage> metalImage = nullptr;
 #endif
     // 用作记录GPU输出大小
     ImageFormat outFormat = {};
@@ -51,6 +55,10 @@ class AOCE_VULKAN_EXPORT VkOutputLayer : public OutputLayer, public VkLayer {
 #endif
 #if WIN32
     virtual void outDx11GpuTex(void* device, void* tex) override;
+#endif
+#if __APPLE__
+    virtual bool outMetalGpuTex(MetalOutGpuTex& outTex,
+                                int32_t outIndex = 0) override;
 #endif
 };
 

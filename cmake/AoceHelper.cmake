@@ -59,6 +59,8 @@ macro(create_search_paths PREFIX)
       set(platform_dir ${dir}/x64)
     elseif(ANDROID)
       set(platform_dir ${dir}/android)
+    elseif(IOS)
+      set(platform_dir ${dir}/ios)
     endif()    
     set(${PREFIX}_INC_SEARCH_PATH ${${PREFIX}_INC_SEARCH_PATH}
       ${platform_dir}/include ${platform_dir}/Include ${platform_dir}/include/${PREFIX} ${platform_dir}/Headers)

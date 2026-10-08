@@ -111,7 +111,9 @@ class AOCE_VULKAN_EXPORT VulkanWindow {
     void initWindow(std::function<void()> onInitWindow = nullptr);
 
     void initSurface(ANativeWindow *window);
-
+#elif defined(VK_USE_PLATFORM_METAL_EXT)
+    // layer: CAMetalLayer
+    void initSurface(const void *layer);
 #endif
 
     // 没有调用initWindow,无效

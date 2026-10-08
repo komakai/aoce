@@ -2,6 +2,7 @@
 /thirdparty/
 code/aoce/AoceBuildSettingsWin.h
 code/aoce/AoceBuildSettingsAndroid.h
+code/aoce/AoceBuildSettingsIOS.h
 android/base/CMakeFiles/
 android/base/cmake_install.cmake
 android/build
@@ -67,3 +68,7 @@ code/aoce_unity3d/
 doc/work/
 
 
+
+# iOS (ios/build_ios.sh)
+ios/build/
+ios/*.log

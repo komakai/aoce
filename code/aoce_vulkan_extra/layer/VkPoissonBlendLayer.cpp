@@ -50,8 +50,15 @@ void VkPoissonBlendLayer::onInitGraph() {
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT});
     items.push_back(
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT});
+#if __APPLE__
+    // iOS的shader(glsl/ios)不同时读写同一张图(Metal Read-Write Texture
+    // Tier1的设备不支持读写rgba8),用二个descriptor set来回交换输入输出
+    layout->addSetLayout(items, 2);
+    layout->generateLayout();
+#else
     layout->addSetLayout(items);
     layout->generateLayout(sizeof(int32_t));
+#endif
 
     pipeGraph->addNode(copyLayer.get());
 }
@@ -62,6 +69,48 @@ void VkPoissonBlendLayer::onInitNode() {
     setStartNode(this, 1, 1);
 }
 
+#if __APPLE__
+void VkPoissonBlendLayer::onInitPipe() {
+    for (auto* tex : {inTexs[0].get(), inTexs[1].get(), outTexs[0].get()}) {
+        tex->descInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+    // set 0: inTexs[0]->outTexs[0], set 1: outTexs[0]->inTexs[0]
+    layout->updateSetLayout(0, 0, &inTexs[0]->descInfo, &inTexs[1]->descInfo,
+                            &outTexs[0]->descInfo, &constBuf->descInfo);
+    layout->updateSetLayout(0, 1, &outTexs[0]->descInfo, &inTexs[1]->descInfo,
+                            &inTexs[0]->descInfo, &constBuf->descInfo);
+    auto computePipelineInfo = VulkanPipeline::createComputePipelineInfo(
+        layout->pipelineLayout, shader->shaderStage);
+    VK_CHECK_RESULT(vkCreateComputePipelines(
+        context->device, context->pipelineCache, 1, &computePipelineInfo,
+        nullptr, &computerPipeline));
+}
+
+void VkPoissonBlendLayer::onCommand() {
+    // ping-pong 单数次,最后结果在outTexs[0]
+    paramet.iterationNum = paramet.iterationNum / 2 * 2 + 1;
+    for (int32_t i = 0; i < paramet.iterationNum; i++) {
+        int32_t pong = i % 2;
+        VulkanTexture* srcTex = pong == 0 ? inTexs[0].get() : outTexs[0].get();
+        VulkanTexture* dstTex = pong == 0 ? outTexs[0].get() : inTexs[0].get();
+        srcTex->addBarrier(cmd, VK_IMAGE_LAYOUT_GENERAL,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_ACCESS_SHADER_READ_BIT);
+        inTexs[1]->addBarrier(cmd, VK_IMAGE_LAYOUT_GENERAL,
+                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              VK_ACCESS_SHADER_READ_BIT);
+        dstTex->addBarrier(cmd, VK_IMAGE_LAYOUT_GENERAL,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_ACCESS_SHADER_WRITE_BIT);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          computerPipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                layout->pipelineLayout, 0, 1,
+                                &layout->descSets[0][pong], 0, 0);
+        vkCmdDispatch(cmd, sizeX, sizeY, 1);
+    }
+}
+#else
 void VkPoissonBlendLayer::onCommand() {
     // ping-pong 单数次
     paramet.iterationNum = paramet.iterationNum / 2 * 2 + 1;
@@ -87,6 +136,8 @@ void VkPoissonBlendLayer::onCommand() {
         vkCmdDispatch(cmd, sizeX, sizeY, 1);
     }
 }
+
+#endif
 
 }  // namespace layer
 }  // namespace vulkan

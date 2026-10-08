@@ -22,7 +22,7 @@ VkResizeLayer::VkResizeLayer(ImageType imageType) {
     paramet.bLinear = 1;
     paramet.newWidth = 1920;
     paramet.newHeight = 1080;
-#if __ANDROID__
+#if __ANDROID__ || __APPLE__
     paramet.newWidth = 1280;
     paramet.newHeight = 720;
 #endif

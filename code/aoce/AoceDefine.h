@@ -3,6 +3,8 @@
 #include "AoceBuildSettingsWin.h"
 #elif __ANDROID__
 #include "AoceBuildSettingsAndroid.h"
+#elif __APPLE__
+#include "AoceBuildSettingsIOS.h"
 #endif
 
 #ifdef _WIN32
@@ -11,7 +13,7 @@
 #else
 #define ACOE_EXPORT __declspec(dllimport)
 #endif
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
 #if defined(AOCE_EXPORT_DEFINE)
 #define ACOE_EXPORT __attribute__((visibility("default")))
 #else
@@ -54,9 +56,11 @@
 #endif
 
 #if AOCE_USE_STATIC
-#define ADD_MODULE(ModuleClass, ModuleName)                            \
-    static aoce::StaticLinkModule<ModuleClass> LinkModule##ModuleName( \
-        #ModuleName);
+// 静态链接(iOS)时不能dlopen,每个模块导出NewModule_模块名,由宿主程序注册到ModuleManager
+#define ADD_MODULE(ModuleClass, ModuleName)                       \
+    extern "C" AOCE_DLL_EXPORT IModule* NewModule_##ModuleName() { \
+        return new ModuleClass();                                 \
+    }
 #else
 #define ADD_MODULE(ModuleClass, ModuleName)           \
     extern "C" AOCE_DLL_EXPORT IModule* NewModule() { \

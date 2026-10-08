@@ -128,6 +128,8 @@ void VulkanWindow::initWindow(std::function<void()> onInitWindow) {
 void VulkanWindow::initSurface(HINSTANCE inst, HWND windowHandle)
 #elif defined(__ANDROID__)
 void VulkanWindow::initSurface(ANativeWindow* window)
+#elif defined(VK_USE_PLATFORM_METAL_EXT)
+void VulkanWindow::initSurface(const void* layer)
 #endif
 {
     VkResult ret = VK_SUCCESS;
@@ -146,6 +148,11 @@ void VulkanWindow::initSurface(ANativeWindow* window)
     surfaceCreateInfo.pNext = nullptr;
     ret =
         vkCreateAndroidSurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
+#elif defined(VK_USE_PLATFORM_METAL_EXT)
+    VkMetalSurfaceCreateInfoEXT surfaceCreateInfo = {};
+    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
+    surfaceCreateInfo.pLayer = (const CAMetalLayer*)layer;
+    ret = vkCreateMetalSurfaceEXT(instance, &surfaceCreateInfo, NULL, &surface);
 #endif
     bool bfind =
         VulkanManager::Get().findSurfaceQueue(surface, presentQueueIndex);

@@ -53,6 +53,8 @@ enum class CameraType : int32_t {
     win_mf,
     and_camera2,
     realsense,
+    // iOS AVFoundation
+    ios_avfoundation,
 };
 
 // aoce外部接收图像暂时就包含这几种

@@ -31,6 +31,10 @@ namespace fs = std::experimental::filesystem;
 #include <stdlib.h>
 
 #include "AoceManager.hpp"
+#elif __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#include <limits.h>
+#include <os/log.h>
 #endif
 
 namespace aoce {
@@ -111,6 +115,23 @@ void logMessage(LogLevel level, const char* message) {
             default:
                 break;
         }
+#elif __APPLE__
+        os_log_type_t logType = OS_LOG_TYPE_INFO;
+        switch (level) {
+            case LogLevel::warn:
+                logType = OS_LOG_TYPE_DEFAULT;
+                break;
+            case LogLevel::error:
+                logType = OS_LOG_TYPE_ERROR;
+                break;
+            case LogLevel::debug:
+                logType = OS_LOG_TYPE_DEBUG;
+                break;
+            default:
+                break;
+        }
+        os_log_with_type(OS_LOG_DEFAULT, logType, "aoce(%{public}s): %{public}s",
+                         getLogLevel(level), message);
 #endif
     }
 }
@@ -551,6 +572,24 @@ std::string getAocePath() {
     return path;
 #elif __ANDROID__
     return "";
+#elif __APPLE__
+    // 资源(glsl/net等)放在app bundle的资源目录下
+    std::string path = "";
+    CFBundleRef bundle = CFBundleGetMainBundle();
+    if (bundle) {
+        CFURLRef url = CFBundleCopyResourcesDirectoryURL(bundle);
+        if (url) {
+            char sz[PATH_MAX] = {0};
+            CFURLRef absUrl = CFURLCopyAbsoluteURL(url);
+            if (CFURLGetFileSystemRepresentation(absUrl, true, (UInt8*)sz,
+                                                 PATH_MAX)) {
+                path = sz;
+            }
+            CFRelease(absUrl);
+            CFRelease(url);
+        }
+    }
+    return path;
 #endif
 }
 
@@ -631,6 +670,8 @@ void loadAoce() {
     ModuleManager::Get().regAndLoad("aoce_cuda");
 #elif __ANDROID__
     ModuleManager::Get().regAndLoad("aoce_android");
+#elif __APPLE__
+    ModuleManager::Get().regAndLoad("aoce_ios");
 #endif
 // 加载ffmpeg
 #if defined(AOCE_INSTALL_FFMPEG)
@@ -671,6 +712,8 @@ void unloadAoce() {
     ModuleManager::Get().unloadModule("aoce_cuda");
 #elif __ANDROID__
     ModuleManager::Get().unloadModule("aoce_android");
+#elif __APPLE__
+    ModuleManager::Get().unloadModule("aoce_ios");
 #endif
 #if defined(AOCE_INSTALL_AGORA)
     ModuleManager::Get().unloadModule("aoce_agora");

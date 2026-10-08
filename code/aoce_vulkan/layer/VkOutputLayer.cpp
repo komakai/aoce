@@ -22,6 +22,10 @@ void VkOutputLayer::onInitGraph() {
     if (VulkanManager::Get().bInterpGLES) {
         hardwareImage = std::make_unique<HardwareImage>();
     }
+#elif __APPLE__
+    if (VulkanManager::Get().bInterpMetal) {
+        metalImage = std::make_unique<MetalImage>();
+    }
 #endif
 }
 
@@ -51,6 +55,12 @@ void VkOutputLayer::onInitVkBuffer() {
 #if __ANDROID_API__ >= 26
     if (VulkanManager::Get().bInterpGLES && paramet.bGpu) {
         hardwareImage->createAndroidBuffer(outFormat);
+    }
+#endif
+#if __APPLE__
+    // 和输入同样大小,显示时由Metal缩放
+    if (metalImage && paramet.bGpu) {
+        metalImage->createImage(inFormats[0]);
     }
 #endif
     onFormatChanged(inFormats[0], 0);
@@ -89,6 +99,12 @@ void VkOutputLayer::onCommand() {
             bInterop = true;
         }
 #endif
+#if __APPLE__
+        if (metalImage) {
+            destImage = metalImage->getImage();
+            bInterop = true;
+        }
+#endif
         if (bInterop && destImage) {
             inTexs[0]->addBarrier(cmd, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                   VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -108,6 +124,13 @@ void VkOutputLayer::onCommand() {
                                          hardwareImage->getFormat().width,
                                          hardwareImage->getFormat().height);
 
+#endif
+#if __APPLE__
+            // blit可以把r8等格式转换成rgba8
+            VulkanManager::blitFillImage(cmd, inTexs[0].get(),
+                                         metalImage->getImage(),
+                                         metalImage->getFormat().width,
+                                         metalImage->getFormat().height);
 #endif
         }
     }
@@ -185,6 +208,21 @@ void VkOutputLayer::outGLGpuTex(const GLOutGpuTex& outTex, uint32_t texType,
         hardwareImage->bindGL(outTex.image, bindType);
     }
 #endif
+}
+#endif
+
+#if __APPLE__
+bool VkOutputLayer::outMetalGpuTex(MetalOutGpuTex& outTex, int32_t outIndex) {
+    if (!pipeGraph || !vkPipeGraph->resourceReady()) {
+        return false;
+    }
+    if (!paramet.bGpu || !metalImage || !metalImage->getTexture()) {
+        return false;
+    }
+    outTex.texture = metalImage->getTexture();
+    outTex.width = metalImage->getFormat().width;
+    outTex.height = metalImage->getFormat().height;
+    return true;
 }
 #endif
 

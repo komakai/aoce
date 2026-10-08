@@ -1,3 +1,6 @@
+#include <fstream>
+#include <sstream>
+
 #include "CNNHelper.hpp"
 #include "FaceDetector.hpp"
 #include "FaceKeypointDetector.hpp"
@@ -80,6 +83,28 @@ void testVkMat(ncnn::VkMat& mat) {
 #endif
 }
 
+#if __APPLE__
+// A9等老设备上Metal编译器在大核平均池化(如pfld里14x14/7x7)的shader上会卡死,
+// 这类层通过featmask(31=16,no vulkan)改用CPU计算
+static std::string patchParamForMetal(const std::string& param) {
+    std::istringstream input(param);
+    std::string result;
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.compare(0, 7, "Pooling") == 0 &&
+            line.find(" 0=1") != std::string::npos &&
+            line.find(" 31=") == std::string::npos) {
+            size_t pos = line.find(" 1=");
+            if (pos != std::string::npos && atoi(line.c_str() + pos + 3) >= 7) {
+                line += " 31=16";
+            }
+        }
+        result += line + "\n";
+    }
+    return result;
+}
+#endif
+
 int32_t loadNet(ncnn::Net* net, const std::string& paramFile,
                 const std::string& modelFile) {
 #if defined(__ANDROID__)
@@ -92,7 +117,16 @@ int32_t loadNet(ncnn::Net* net, const std::string& paramFile,
 #else
     std::string paramPath = getAocePath() + "/" + paramFile;
     std::string modelPath = getAocePath() + "/" + modelFile;
+#if __APPLE__
+    std::ifstream paramStream(paramPath);
+    std::stringstream paramText;
+    paramText << paramStream.rdbuf();
+    // load_param_mem不复制字符串,需要在load_param_mem期间有效
+    std::string patched = patchParamForMetal(paramText.str());
+    int32_t ret = net->load_param_mem(patched.c_str());
+#else
     int32_t ret = net->load_param(paramPath.c_str());
+#endif
     if (ret == 0) {
         ret = net->load_model(modelPath.c_str());
     }

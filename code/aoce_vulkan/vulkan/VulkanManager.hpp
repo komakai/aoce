@@ -68,6 +68,8 @@ class AOCE_VULKAN_EXPORT VulkanManager {
 #if __ANDROID__
     bool bAndroidHardware = false;
 #endif
+    // MoltenVK:是否支持VK_EXT_metal_objects导出MTLTexture
+    bool bInterpMetal = false;
 #if AOCE_DEBUG_TYPE
     VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 #endif

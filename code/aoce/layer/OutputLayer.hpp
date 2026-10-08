@@ -32,5 +32,10 @@ class ACOE_EXPORT OutputLayer : public IOutputLayer {
     virtual void outGLGpuTex(const GLOutGpuTex& outTex, uint32_t texType = 0,
                              int32_t outIndex = 0) override{};
 
+    virtual bool outMetalGpuTex(MetalOutGpuTex& outTex,
+                                int32_t outIndex = 0) override {
+        return false;
+    };
+
 };
 }  // namespace aoce

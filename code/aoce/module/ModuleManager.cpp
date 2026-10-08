@@ -9,7 +9,7 @@
 #include <sysinfoapi.h>
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "shlwapi.lib")
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
 #include <dlfcn.h>
 //#include <libunwind.h>
 #endif
@@ -37,6 +37,8 @@ void ModuleManager::registerModule(const char* name, loadModuleHandle handle) {
     moduleInfo->name = name;
 #if __ANDROID__
     moduleInfo->name = "lib" + moduleInfo->name + ".so";
+#elif __APPLE__
+    moduleInfo->name = "lib" + moduleInfo->name + ".dylib";
 #endif
     moduleInfo->onLoadEvent = handle;
 }
@@ -68,7 +70,7 @@ void ModuleManager::loadModule(const char* name) {
                 (HMODULE)moduleInfo->handle, "NewModule");
         }
         SetDllDirectoryA(temp);
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
         moduleInfo->handle =
             dlopen(moduleInfo->name.c_str(), RTLD_NOW | RTLD_LOCAL);
         if (moduleInfo->handle) {
@@ -128,7 +130,7 @@ void ModuleManager::unloadModule(const char* name) {
     if (moduleInfo->handle) {
 #if WIN32
         FreeLibrary((HMODULE)moduleInfo->handle);
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
         dlclose(moduleInfo->handle);
 #endif
         moduleInfo->handle = nullptr;
@@ -141,7 +143,9 @@ bool ModuleManager::checkLoadModel(const char* name) {
         return false;
     }
     ModuleInfo* moduleInfo = modules[name];
-    if (!moduleInfo->load || !moduleInfo->handle) {
+    // 静态注册的模块(onLoadEvent)没有动态库句柄
+    if (!moduleInfo->load ||
+        (!moduleInfo->handle && !moduleInfo->onLoadEvent)) {
         return false;
     }
     return moduleInfo->load;

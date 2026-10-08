@@ -35,6 +35,8 @@ vulkan项目使用glsl,请安装Vulkan SDK,通过工具glslangValidator把glsl�
 
 Android配置请转到 [android build](android/README.md)
 
+iOS配置请转到 [ios build](ios/README.md)(基于MoltenVK,对应android下的aoceswigtest/aocencnntest)
+
 ## 做什么
 
 主要想实现一个能在win/andorid方便组合,扩展的GPU图像处理框架.

@@ -62,6 +62,9 @@ class IOutputLayer : public AOutputLayer {
 
     virtual void outGLGpuTex(const GLOutGpuTex& outTex, uint32_t texType = 0,
                              int32_t outIndex = 0) = 0;
+    // iOS: 得到包含输出结果的MTLTexture,资源未准备好返回false
+    virtual bool outMetalGpuTex(MetalOutGpuTex& outTex,
+                                int32_t outIndex = 0) = 0;
 };
 
 // 在AoceManager注册vulkan/dx11/cuda类型的LayerFactory

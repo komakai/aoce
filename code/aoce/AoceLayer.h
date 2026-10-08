@@ -118,6 +118,13 @@ struct GLOutGpuTex{
     int32_t height = 720;
 };
 
+// iOS/MoltenVK: 输出层导出的MTLTexture(id<MTLTexture>),由输出层持有
+struct MetalOutGpuTex {
+    void *texture = nullptr;
+    int32_t width = 0;
+    int32_t height = 0;
+};
+
 class IOutputLayerObserver {
    public:
     virtual ~IOutputLayerObserver(){};

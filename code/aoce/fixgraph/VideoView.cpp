@@ -10,7 +10,7 @@ VideoView::VideoView(GpuType gpuType) {
     if (gpuType == GpuType::other) {
         this->gpuType = GpuType::cuda;
     }
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
     this->gpuType = GpuType::vulkan;
 #endif
     // 生成一张执行图

@@ -2,9 +2,13 @@
 #include "VulkanManager.hpp"
 
 #include <vulkan/vulkan.h>
+
+#include <cstring>
 #if __ANDROID__
 #include "../android/HardwareImage.hpp"
 #include "../android/vulkan_wrapper.h"
+#elif __APPLE__
+#include "../apple/MetalImage.hpp"
 #endif
 
 namespace aoce {
@@ -167,6 +171,13 @@ void VulkanManager::onDeviceComplete() {
         logMessage(LogLevel::info, "aoce_vulkan can interp opengl es");
     }
 #endif
+#if __APPLE__
+    if (!bInterpMetal) {
+        logMessage(LogLevel::warn, "aoce_vulkan not interp metal");
+    } else {
+        logMessage(LogLevel::info, "aoce_vulkan can interp metal");
+    }
+#endif
 }
 
 bool VulkanManager::createInstance(const char* appName) {
@@ -286,6 +297,25 @@ bool VulkanManager::createDevice(bool bAloneCompute) {
     deviceExtensions.push_back(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
     deviceExtensions.push_back(
         VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
+#elif __APPLE__
+    // MoltenVK是vulkan portability实现,支持的话必需开启VK_KHR_portability_subset
+    {
+        uint32_t count = 0;
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                             nullptr);
+        std::vector<VkExtensionProperties> extensions(count);
+        vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &count,
+                                             extensions.data());
+        for (auto& ext : extensions) {
+            if (strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0) {
+                deviceExtensions.push_back("VK_KHR_portability_subset");
+            }
+        }
+    }
+    bInterpMetal = supportMetalObjects(physicalDevice);
+    if (bInterpMetal) {
+        deviceExtensions.push_back(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
+    }
 #endif
     deviceCreateInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();

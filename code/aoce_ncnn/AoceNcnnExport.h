@@ -9,7 +9,7 @@
 #else
 #define AOCE_NCNN_EXPORT __declspec(dllimport)
 #endif
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
 #if defined(AOCE_VULKAN_EXTRA_EXPORT_DEFINE)
 #define AOCE_NCNN_EXPORT __attribute__((visibility("default")))
 #else

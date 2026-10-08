@@ -20,7 +20,8 @@ VkColourFASTFeatureDetector::VkColourFASTFeatureDetector(/* args */) {
 VkColourFASTFeatureDetector::~VkColourFASTFeatureDetector() {}
 
 bool VkColourFASTFeatureDetector::getSampled(int inIndex) {
-    return inIndex == 0;
+    // shader里二个输入都是sampler2D,descriptor类型需要一致(Metal argument buffer会校验)
+    return inIndex == 0 || inIndex == 1;
 }
 
 void VkColourFASTFeatureDetector::onUpdateParamet() {

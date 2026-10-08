@@ -31,6 +31,9 @@ class VkPoissonBlendLayer : public VkLayer, public ITLayer<PoissonParamet> {
     virtual void onUpdateParamet() override;
     virtual void onInitGraph() override;
     virtual void onInitNode() override;
+#if __APPLE__
+    virtual void onInitPipe() override;
+#endif
     virtual void onCommand() override;
 };
 

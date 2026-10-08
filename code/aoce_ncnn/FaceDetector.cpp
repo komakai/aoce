@@ -17,7 +17,7 @@ FaceDetector::FaceDetector(/* args */) {
 // 网络输入图像格式
 #if WIN32
     netShortSide = 240;
-#elif __ANDROID__
+#elif __ANDROID__ || __APPLE__
     netShortSide = 120;
 #endif
     // 收到第一帧后会按画面比例调整(updateNetFormat)

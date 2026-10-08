@@ -60,7 +60,7 @@ VkGuidedLayer::VkGuidedLayer(/* args */) {
     resize1Layer = std::make_unique<VkResizeLayer>(ImageType::rgba32f);
     int32_t cwidth = 1920;
     int32_t cheight = 1080;
-#if __ANDROID__
+#if __ANDROID__ || __APPLE__
     cwidth = 1280;
     cheight = 720;
 #endif

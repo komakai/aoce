@@ -22,6 +22,8 @@ if(WIN32)
     endif()
 elseif(ANDROID)    
     add_subdirectory(aoce_android)
+elseif(IOS)
+    add_subdirectory(aoce_ios)
 endif()
 
 if(AOCE_INSTALL_AGORA AND AOCE_AGORA_EXIST)
